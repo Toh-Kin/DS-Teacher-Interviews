@@ -183,8 +183,10 @@ textarea{min-height:150px;resize:vertical}
       <div id="st-msg" style="margin-top:10px"></div>
     </div>
     <div class="card">
-      <button class="btn sec block" id="st-link">Copy setup link for teammates</button>
-      <p class="help">Send this link privately. Opening it sets the server URL and passcode on their phone.</p>
+      <label for="st-link-name" style="margin-top:0">Teammate's name (optional)</label>
+      <input type="text" id="st-link-name" placeholder="e.g. Xavier" autocomplete="off">
+      <button class="btn sec block" id="st-link" style="margin-top:10px">Copy setup link for this teammate</button>
+      <p class="help">Send the link privately. Opening it sets the server URL, passcode and name on their phone and loads the questions. Nothing to type.</p>
     </div>
     <div class="card">
       <div class="stat"><span>App version</span><b id="st-ver"></b></div>
@@ -205,7 +207,7 @@ textarea{min-height:150px;resize:vertical}
 <script>
 'use strict';
 /* ===== basics ===== */
-const APP_VERSION = '0.2.0';
+const APP_VERSION = '0.2.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad = n => String(n).padStart(2, '0');
@@ -225,7 +227,10 @@ const DEMO_QUESTIONS = [
 ];
 
 /* ===== settings & config (kept in localStorage) ===== */
-const getSettings = () => { try { return JSON.parse(localStorage.getItem('settings')||'{}'); } catch(e){ return {}; } };
+/* Optional: paste your server URL (…/exec) between the quotes. Then teammates never need to type it. */
+const DEFAULT_SERVER_URL = '';
+const getSettings = () => { let s = {}; try { s = JSON.parse(localStorage.getItem('settings')||'{}') || {}; } catch(e){}
+  if (!s.scriptUrl) s.scriptUrl = DEFAULT_SERVER_URL; return s; };
 const setSettings = o => localStorage.setItem('settings', JSON.stringify({...getSettings(), ...o}));
 const getConfig = () => { try { return JSON.parse(localStorage.getItem('config')||'null'); } catch(e){ return null; } };
 const isConfigured = () => { const s = getSettings(); return !!(s.scriptUrl && s.passcode); };
@@ -235,8 +240,12 @@ const isDemo = () => !(getConfig() && getConfig().questions && getConfig().quest
 /* Setup link: ?u=<server url>&k=<passcode> */
 (function applySetupLink(){
   const p = new URLSearchParams(location.search);
-  if (p.get('u') && p.get('k')) {
-    setSettings({scriptUrl: p.get('u'), passcode: p.get('k')});
+  if (p.get('u') || p.get('k') || p.get('n')) {
+    const o = {};
+    if (p.get('u')) o.scriptUrl = p.get('u');
+    if (p.get('k')) o.passcode = p.get('k');
+    if (p.get('n')) o.interviewer = p.get('n');
+    setSettings(o);
     history.replaceState(null, '', location.pathname);
     window.__setupFromLink = true;
   }
@@ -310,7 +319,7 @@ async function renderHome(){
   const all = await dbAll('interviews');
   const stuck = all.filter(r => r.status === 'recording' && !(R && R.rec.id === r.id));
   stuck.forEach(r => b.push(`<div class="banner red">An earlier interview (${esc(r.school)} / ${esc(r.interviewee)}) was interrupted. <button class="btn sm" data-recover="${esc(r.id)}">Recover and save it</button></div>`));
-  if (window.__setupFromLink) { b.push(`<div class="banner ok">Setup link applied. Open <b>Settings</b> and tap "Save and update questions".</div>`); window.__setupFromLink = false; }
+  if (window.__setupMsg) { b.push(`<div class="banner ${window.__setupOk ? 'ok' : ''}">${esc(window.__setupMsg)}</div>`); window.__setupMsg = ''; }
   $('#home-banners').innerHTML = b.join('');
   const rb = $('#b-resume'); if (rb) rb.onclick = () => show('run');
   document.querySelectorAll('[data-recover]').forEach(el => el.onclick = () => recoverInterview(el.dataset.recover));
@@ -624,7 +633,8 @@ $('#st-save').onclick = async () => {
 };
 $('#st-link').onclick = async () => {
   const s = getSettings(); if (!s.scriptUrl || !s.passcode) return toast('Save the URL and passcode first');
-  const link = location.origin + location.pathname + '?u=' + encodeURIComponent(s.scriptUrl) + '&k=' + encodeURIComponent(s.passcode);
+  const nm = $('#st-link-name').value.trim();
+  const link = location.origin + location.pathname + '?u=' + encodeURIComponent(s.scriptUrl) + '&k=' + encodeURIComponent(s.passcode) + (nm ? '&n=' + encodeURIComponent(nm) : '');
   try { await navigator.clipboard.writeText(link); toast('Link copied'); } catch(e){ prompt('Copy this link:', link); }
 };
 
@@ -632,6 +642,15 @@ $('#st-link').onclick = async () => {
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 (async function init(){
   await db();
+  if (window.__setupFromLink) {
+    window.__setupFromLink = false;
+    if (!isConfigured()) { window.__setupMsg = 'Setup link applied, but the passcode or server URL is missing. Open Settings.'; }
+    else if (!navigator.onLine) { window.__setupMsg = 'Setup saved. You are offline: open Settings and tap "Save and update questions" when you have a connection.'; }
+    else {
+      try { await updateConfig(); const c = getConfig(); window.__setupOk = true; window.__setupMsg = 'Setup done. ' + c.questions.length + ' questions and ' + c.schools.length + ' schools loaded.'; }
+      catch(e){ window.__setupMsg = 'Setup saved, but questions could not be loaded: ' + (e.message || e) + ' Open Settings and try again.'; }
+    }
+  }
   show('home');
 })();
 </script>
