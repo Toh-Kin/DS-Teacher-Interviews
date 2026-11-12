@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e7490">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Interviews">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Interview Recorder</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--ink:#16212b;--mute:#5b6b7a;--line:#d9e0e6;--pri:#0e7490;--pri-d:#0b5a72;--red:#dc2626;--ok:#15803d;--warn:#b45309;--warn-bg:#fef3c7}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{min-height:100vh;padding-bottom:env(safe-area-inset-bottom)}
+header{background:var(--pri);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:5}
+header h1{font-size:17px;margin:0;flex:1}
+header button{background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:8px;padding:8px 12px;font-size:14px}
+main{max-width:640px;margin:0 auto;padding:14px 14px 110px}
+.screen{display:none}.screen.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+h2{font-size:18px;margin:0 0 8px}
+label{display:block;font-weight:600;margin:12px 0 4px;font-size:14px}
+input[type=text],input[type=password],input[type=url],select,textarea{width:100%;font:inherit;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+textarea{min-height:150px;resize:vertical}
+.help{color:var(--mute);font-size:13px;margin:4px 0 0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font:inherit;font-weight:600;border:0;border-radius:12px;padding:13px 16px;min-height:48px;background:var(--pri);color:#fff;cursor:pointer}
+.btn:active{background:var(--pri-d)}
+.btn.sec{background:#e6edf2;color:var(--ink)}
+.btn.red{background:var(--red)}
+.btn.ok{background:var(--ok)}
+.btn.sm{min-height:38px;padding:8px 12px;font-size:14px;border-radius:9px}
+.btn[disabled]{opacity:.5}
+.btn.block{display:flex;width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>.grow{flex:1}
+.banner{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px}
+.banner.red{background:#fee2e2;color:#991b1b}
+.banner.ok{background:#dcfce7;color:#166534}
+.stat{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}
+.stat:last-child{border:0}
+.chip{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:99px;background:#e0f2fe;color:#075985}
+.chip.s-sent{background:#dcfce7;color:#166534}.chip.s-saved{background:#fef3c7;color:#92400e}.chip.s-recording{background:#fee2e2;color:#991b1b}
+.check{display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-weight:600}
+.check input{width:22px;height:22px;margin-top:2px;flex:none}
+/* run screen */
+.recbar{display:flex;align-items:center;gap:10px;background:#111827;color:#fff;border-radius:12px;padding:10px 12px;margin-bottom:12px}
+.dot{width:14px;height:14px;border-radius:50%;background:var(--red);animation:pulse 1.2s infinite}
+.dot.paused{background:#f59e0b;animation:none}
+@keyframes pulse{50%{opacity:.25}}
+.timer{font:700 22px/1 ui-monospace,Menlo,monospace;flex:1}
+.recbar button{background:rgba(255,255,255,.16);color:#fff;border:0;border-radius:9px;padding:9px 12px;font-size:14px;min-height:40px}
+.qmeta{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--mute);margin-bottom:6px}
+.qtext{font-size:21px;font-weight:700;line-height:1.3;margin:6px 0 10px}
+.probe{background:#f0f9ff;border-left:4px solid #38bdf8;border-radius:6px;padding:8px 10px;font-size:15px;color:#0c4a6e;white-space:pre-wrap}
+.bottombar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:none;gap:10px;z-index:6}
+.bottombar.on{display:flex}
+.bottombar .btn{flex:1}
+.item{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;background:#fff}
+.item .t{font-weight:700;word-break:break-all}
+.item .m{color:var(--mute);font-size:13px;margin:2px 0 8px}
+.prog{height:8px;background:#e6edf2;border-radius:99px;overflow:hidden;margin-top:8px}
+.prog>i{display:block;height:100%;width:0;background:var(--pri);transition:width .2s}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-end;justify-content:center;z-index:20}
+#modal.on{display:flex}
+#modal .sheet{background:#fff;width:100%;max-width:640px;max-height:80vh;overflow:auto;border-radius:16px 16px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom))}
+.qli{display:flex;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);align-items:flex-start}
+.qli.cur{background:#ecfeff}
+.qli b{flex:none;width:34px}
+.qli .tick{margin-left:auto;color:var(--ok);font-weight:700}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom));background:#111827;color:#fff;padding:10px 16px;border-radius:99px;font-size:14px;opacity:0;transition:opacity .2s;z-index:30;pointer-events:none;max-width:90%;text-align:center}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Interview Recorder</h1>
+  <button id="btn-home" hidden>Home</button>
+</header>
+
+<main>
+  <!-- HOME -->
+  <section id="s-home" class="screen">
+    <div id="home-banners"></div>
+    <button class="btn block" id="home-new" style="font-size:18px;min-height:60px">● New interview</button>
+    <div class="row" style="margin-top:10px">
+      <button class="btn sec grow" id="home-outbox">Outbox <span id="home-pending"></span></button>
+      <button class="btn sec grow" id="home-settings">Settings</button>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="stat"><span>Questions</span><b id="home-q"></b></div>
+      <div class="stat"><span>Schools</span><b id="home-s"></b></div>
+      <div class="stat"><span>Interviewer</span><b id="home-who"></b></div>
+      <div class="stat"><span>Connection</span><b id="home-net"></b></div>
+    </div>
+    <p class="help">Tip: do the setup and "Update questions" once while you have Wi-Fi. After that the app works without a connection; send the interviews later.</p>
+  </section>
+
+  <!-- NEW -->
+  <section id="s-new" class="screen">
+    <div class="card">
+      <h2>New interview</h2>
+      <label for="n-school">School</label>
+      <select id="n-school"></select>
+      <input type="text" id="n-school-other" placeholder="Type the school name" style="margin-top:8px" hidden>
+      <label for="n-id">Interviewee ID (initials only)</label>
+      <input type="text" id="n-id" maxlength="12" autocapitalize="characters" autocomplete="off" placeholder="e.g. JM">
+      <p class="help">Initials only, no full names.</p>
+      <label for="n-who">Interviewer</label>
+      <select id="n-who"></select>
+      <input type="text" id="n-who-other" placeholder="Type your name" style="margin-top:8px" hidden>
+      <label class="check"><input type="checkbox" id="n-consent"><span>Consent for recording has been obtained from this person.</span></label>
+    </div>
+    <div id="n-err"></div>
+    <button class="btn red block" id="n-start" style="font-size:18px;min-height:60px">● Start recording</button>
+    <p class="help">The phone will ask for microphone permission the first time. Keep the screen on during the interview.</p>
+  </section>
+
+  <!-- RUN -->
+  <section id="s-run" class="screen">
+    <div id="run-alert"></div>
+    <div class="recbar">
+      <span class="dot" id="r-dot"></span>
+      <span class="timer" id="r-time">00:00</span>
+      <button id="r-pause">Pause</button>
+      <button id="r-flag">⚑ Mark</button>
+    </div>
+    <div class="card">
+      <div class="qmeta"><span id="q-prog"></span><span id="q-stage"></span></div>
+      <div class="qmeta" style="margin:0"><span id="q-section"></span><span id="q-flags"></span></div>
+      <div class="qtext" id="q-text"></div>
+      <div class="probe" id="q-probe"></div>
+    </div>
+    <label for="q-memo" style="margin-top:0">Notes for this question</label>
+    <textarea id="q-memo" placeholder="Type, or tap the microphone on your keyboard to dictate."></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="btn sec sm" id="r-list">All questions</button>
+    </div>
+  </section>
+
+  <!-- FINISH -->
+  <section id="s-finish" class="screen">
+    <div class="card">
+      <h2>Finish interview</h2>
+      <div class="stat"><span>Recording length</span><b id="f-dur"></b></div>
+      <div class="stat"><span>Questions with notes</span><b id="f-notes"></b></div>
+      <div class="stat"><span>Marks</span><b id="f-flags"></b></div>
+      <div id="f-warn" style="margin-top:10px"></div>
+      <label for="f-general">Overall impressions (optional)</label>
+      <textarea id="f-general" style="min-height:110px" placeholder="Anything that does not fit a single question."></textarea>
+    </div>
+    <button class="btn ok block" id="f-save" style="min-height:56px">Stop recording and save</button>
+    <button class="btn sec block" id="f-back" style="margin-top:10px">Back to the interview (recording continues)</button>
+  </section>
+
+  <!-- OUTBOX -->
+  <section id="s-outbox" class="screen">
+    <div id="o-banner"></div>
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn grow" id="o-sendall">Send all unsent</button>
+    </div>
+    <div id="o-list"></div>
+    <p class="help">Sent interviews stay on this phone until you delete them. Keep them there until you have checked the files in Google Drive.</p>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="s-settings" class="screen">
+    <div class="card">
+      <h2>Settings</h2>
+      <label for="st-url">Server URL</label>
+      <input type="url" id="st-url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+      <label for="st-key">Passcode</label>
+      <input type="password" id="st-key" autocomplete="off">
+      <label for="st-who">My name (interviewer)</label>
+      <input type="text" id="st-who" autocomplete="off">
+      <div class="row" style="margin-top:14px">
+        <button class="btn grow" id="st-save">Save and update questions</button>
+      </div>
+      <div id="st-msg" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <button class="btn sec block" id="st-link">Copy setup link for teammates</button>
+      <p class="help">Send this link privately. Opening it sets the server URL and passcode on their phone.</p>
+    </div>
+    <div class="card">
+      <div class="stat"><span>App version</span><b id="st-ver"></b></div>
+      <div class="stat"><span>Storage used / available</span><b id="st-store">…</b></div>
+      <div class="stat"><span>Questions updated</span><b id="st-upd"></b></div>
+    </div>
+  </section>
+</main>
+
+<div class="bottombar" id="run-bar">
+  <button class="btn sec" id="r-prev">◀ Back</button>
+  <button class="btn" id="r-next">Next ▶</button>
+</div>
+
+<div id="modal"><div class="sheet" id="modal-sheet"></div></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ===== basics ===== */
+const APP_VERSION = '0.1.0';
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+const fmtDur = sec => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60; return (h ? h+':'+pad(m) : pad(m)) + ':' + pad(s); };
+const fmtSize = b => b > 1048576 ? (b/1048576).toFixed(1)+' MB' : Math.max(1, Math.round(b/1024))+' KB';
+const CHUNK = window.__CHUNK || 1024*1024;   // 1 MB pieces for upload (window.__CHUNK is only for testing)
+let toastT; function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('on'), 2200); }
+
+/* Demo questions: used until real questions are loaded from the spreadsheet. */
+const DEMO_QUESTIONS = [
+  {no:1, section:'A. Observation', stage:'Observation', question:'(DEMO) Think about the lesson you observed. What did you notice about the learners?', probe:'What did you see or hear that made you say that?', required:true},
+  {no:2, section:'A. Observation', stage:'Observation', question:'(DEMO) What did the student-teacher do well in that lesson?', probe:'Can you give one specific moment?', required:true},
+  {no:3, section:'B. Feedback', stage:'Feedback', question:'(DEMO) What feedback did you give after the lesson?', probe:'When? Face to face or written? How long did it take?', required:true},
+  {no:4, section:'B. Feedback', stage:'Feedback', question:'(DEMO) Why did you choose that feedback?', probe:'What did you want the student-teacher to understand?', required:false},
+  {no:5, section:'C. Next action', stage:'Advice', question:'(DEMO) What advice or next action did you suggest?', probe:'What exactly should they try in the next lesson?', required:true},
+  {no:6, section:'D. Follow-up', stage:'Re-observation', question:'(DEMO) Did you observe the student-teacher again after the advice?', probe:'If yes: what changed? If no: what got in the way?', required:true}
+];
+
+/* ===== settings & config (kept in localStorage) ===== */
+const getSettings = () => { try { return JSON.parse(localStorage.getItem('settings')||'{}'); } catch(e){ return {}; } };
+const setSettings = o => localStorage.setItem('settings', JSON.stringify({...getSettings(), ...o}));
+const getConfig = () => { try { return JSON.parse(localStorage.getItem('config')||'null'); } catch(e){ return null; } };
+const isConfigured = () => { const s = getSettings(); return !!(s.scriptUrl && s.passcode); };
+function questions(){ const c = getConfig(); return (c && c.questions && c.questions.length) ? c.questions : DEMO_QUESTIONS; }
+const isDemo = () => !(getConfig() && getConfig().questions && getConfig().questions.length);
+
+/* Setup link: ?u=<server url>&k=<passcode> */
+(function applySetupLink(){
+  const p = new URLSearchParams(location.search);
+  if (p.get('u') && p.get('k')) {
+    setSettings({scriptUrl: p.get('u'), passcode: p.get('k')});
+    history.replaceState(null, '', location.pathname);
+    window.__setupFromLink = true;
+  }
+})();
+
+/* ===== IndexedDB ===== */
+let _db;
+function db(){
+  if (_db) return Promise.resolve(_db);
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('dsint', 1);
+    r.onupgradeneeded = () => { const d = r.result; d.createObjectStore('interviews', {keyPath:'id'}); d.createObjectStore('chunks', {keyPath:['id','seq']}); };
+    r.onsuccess = () => { _db = r.result; res(_db); };
+    r.onerror = () => rej(r.error);
+  });
+}
+const wrap = req => new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); });
+async function dbPut(store, v){ const d = await db(); return new Promise((res, rej) => { const t = d.transaction(store,'readwrite'); t.objectStore(store).put(v); t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); }
+async function dbGet(store, k){ const d = await db(); return wrap(d.transaction(store).objectStore(store).get(k)); }
+async function dbAll(store){ const d = await db(); return wrap(d.transaction(store).objectStore(store).getAll()); }
+async function dbDel(store, k){ const d = await db(); const t = d.transaction(store,'readwrite'); t.objectStore(store).delete(k); return new Promise((res,rej)=>{ t.oncomplete=res; t.onerror=()=>rej(t.error); }); }
+async function dbChunks(id){ const d = await db(); return wrap(d.transaction('chunks').objectStore('chunks').getAll(IDBKeyRange.bound([id,0],[id,Number.MAX_SAFE_INTEGER]))); }
+async function dbDelChunks(id){ const d = await db(); const t = d.transaction('chunks','readwrite'); t.objectStore('chunks').delete(IDBKeyRange.bound([id,0],[id,Number.MAX_SAFE_INTEGER])); return new Promise((res,rej)=>{ t.oncomplete=res; t.onerror=()=>rej(t.error); }); }
+
+/* ===== server calls ===== */
+async function fetchT(url, opt, ms){
+  const ctl = new AbortController(); const t = setTimeout(()=>ctl.abort(), ms);
+  try { return await fetch(url, {...opt, signal: ctl.signal}); } finally { clearTimeout(t); }
+}
+async function api(payload, ms=90000){
+  const s = getSettings();
+  if (!s.scriptUrl || !s.passcode) throw new Error('Server URL and passcode are not set (Settings).');
+  let r;
+  try { r = await fetchT(s.scriptUrl, {method:'POST', body: JSON.stringify({...payload, key: s.passcode})}, ms); }
+  catch(e){ throw new Error(e.name === 'AbortError' ? 'The connection timed out.' : 'No connection to the server.'); }
+  let j; try { j = await r.json(); } catch(e){ throw new Error('Unexpected reply from the server (check the Web app access setting).'); }
+  if (!j.ok) throw new Error(j.error || 'Server error');
+  return j;
+}
+async function updateConfig(){
+  const j = await api({action:'config'}, 30000);
+  const d = j.data || {};
+  localStorage.setItem('config', JSON.stringify({questions: d.questions||[], schools: d.schools||[], interviewers: d.interviewers||[], fetchedAt: Date.now()}));
+}
+function blobToB64(blob){ return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1] || ''); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob); }); }
+
+/* ===== navigation ===== */
+const SCREENS = ['home','new','run','finish','outbox','settings'];
+let current = 'home';
+function show(name){
+  current = name;
+  SCREENS.forEach(s => $('#s-'+s).classList.toggle('on', s === name));
+  $('#run-bar').classList.toggle('on', name === 'run');
+  $('#btn-home').hidden = (name === 'home' || name === 'run' || name === 'finish');
+  $('#title').textContent = {home:'Interview Recorder', new:'New interview', run:'Interview', finish:'Finish', outbox:'Outbox', settings:'Settings'}[name];
+  window.scrollTo(0, 0);
+  if (name === 'home') renderHome();
+  if (name === 'new') renderNew();
+  if (name === 'outbox') renderOutbox();
+  if (name === 'settings') renderSettings();
+}
+$('#btn-home').onclick = () => show('home');
+
+/* ===== HOME ===== */
+async function renderHome(){
+  const c = getConfig(), s = getSettings();
+  const b = [];
+  if (R) b.push(`<div class="banner red">An interview is in progress. <button class="btn sm" id="b-resume">Return to it</button></div>`);
+  if (!isConfigured()) b.push(`<div class="banner">Not set up yet. Open <b>Settings</b> and enter the server URL and passcode. Until then you can try the app with demo questions, but nothing can be sent.</div>`);
+  else if (isDemo()) b.push(`<div class="banner">Real questions are not loaded yet. Open <b>Settings</b> and tap "Save and update questions" while online.</div>`);
+  const all = await dbAll('interviews');
+  const stuck = all.filter(r => r.status === 'recording' && !(R && R.rec.id === r.id));
+  stuck.forEach(r => b.push(`<div class="banner red">An earlier interview (${esc(r.school)} / ${esc(r.interviewee)}) was interrupted. <button class="btn sm" data-recover="${esc(r.id)}">Recover and save it</button></div>`));
+  if (window.__setupFromLink) { b.push(`<div class="banner ok">Setup link applied. Open <b>Settings</b> and tap "Save and update questions".</div>`); window.__setupFromLink = false; }
+  $('#home-banners').innerHTML = b.join('');
+  const rb = $('#b-resume'); if (rb) rb.onclick = () => show('run');
+  document.querySelectorAll('[data-recover]').forEach(el => el.onclick = () => recoverInterview(el.dataset.recover));
+  const pending = all.filter(r => r.status === 'saved').length;
+  $('#home-pending').textContent = pending ? '(' + pending + ' unsent)' : '';
+  $('#home-q').textContent = isDemo() ? 'demo (' + DEMO_QUESTIONS.length + ')' : questions().length;
+  $('#home-s').textContent = c && c.schools ? c.schools.length : '—';
+  $('#home-who').textContent = s.interviewer || '—';
+  $('#home-net').textContent = navigator.onLine ? 'online' : 'offline';
+}
+$('#home-new').onclick = () => { if (R) { show('run'); return; } show('new'); };
+$('#home-outbox').onclick = () => show('outbox');
+$('#home-settings').onclick = () => show('settings');
+window.addEventListener('online', () => { if (current === 'home') renderHome(); });
+window.addEventListener('offline', () => { if (current === 'home') renderHome(); });
+
+/* ===== NEW INTERVIEW ===== */
+function fillSelect(sel, list, otherInput, saved){
+  const opts = ['<option value="">— choose —</option>'].concat(list.map(x => `<option>${esc(x)}</option>`), ['<option value="__other">Other…</option>']);
+  sel.innerHTML = opts.join('');
+  if (saved && list.includes(saved)) sel.value = saved;
+  else if (saved) { sel.value = '__other'; otherInput.hidden = false; otherInput.value = saved; }
+  sel.onchange = () => { otherInput.hidden = sel.value !== '__other'; };
+}
+function renderNew(){
+  const c = getConfig() || {}, s = getSettings();
+  fillSelect($('#n-school'), c.schools || [], $('#n-school-other'), '');
+  $('#n-school-other').hidden = true; $('#n-school-other').value = '';
+  fillSelect($('#n-who'), c.interviewers || [], $('#n-who-other'), s.interviewer || '');
+  $('#n-id').value = ''; $('#n-consent').checked = false; $('#n-err').innerHTML = '';
+}
+const pick = (sel, other) => (sel.value === '__other' ? other.value.trim() : sel.value);
+const safe = s => String(s).trim().replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_+|_+$/g, '');
+function pickMime(){
+  if (!window.MediaRecorder) return null;
+  const c = ['audio/webm;codecs=opus','audio/webm','audio/mp4;codecs=mp4a.40.2','audio/mp4','audio/ogg;codecs=opus'];
+  return c.find(m => MediaRecorder.isTypeSupported(m)) || '';
+}
+$('#n-start').onclick = async () => {
+  const school = pick($('#n-school'), $('#n-school-other'));
+  const who = pick($('#n-who'), $('#n-who-other'));
+  const iid = $('#n-id').value.trim().toUpperCase();
+  const errs = [];
+  if (!school) errs.push('Choose the school.');
+  if (!/^[A-Z0-9]{1,12}$/.test(iid)) errs.push('Interviewee ID: letters/numbers only (initials), no spaces.');
+  if (!who) errs.push('Choose the interviewer.');
+  if (!$('#n-consent').checked) errs.push('Tick the consent box (consent must be obtained before recording).');
+  if (errs.length) { $('#n-err').innerHTML = '<div class="banner red">' + errs.map(esc).join('<br>') + '</div>'; return; }
+  setSettings({interviewer: who});
+  const btn = $('#n-start'); btn.disabled = true;
+  try { await beginInterview({school, interviewee: iid, interviewer: who}); }
+  catch(e){ $('#n-err').innerHTML = '<div class="banner red">' + esc(e.message || e) + '</div>'; }
+  finally { btn.disabled = false; }
+};
+
+/* ===== RECORDING ===== */
+let R = null;   // active interview: {rec, questions, idx, stream, recorder, ...}
+let wake = null;
+async function keepAwake(){ try { if ('wakeLock' in navigator) wake = await navigator.wakeLock.request('screen'); } catch(e){} }
+function releaseAwake(){ try { wake && wake.release(); } catch(e){} wake = null; }
+const elapsed = () => R ? R.accum + (R.running ? Date.now() - R.since : 0) : 0;      // ms of recorded audio
+
+async function beginInterview(meta){
+  if (!navigator.mediaDevices || !window.MediaRecorder) throw new Error('This browser cannot record audio. Use Chrome (Android) or Safari (iPhone, iOS 14.3 or newer).');
+  const mime = pickMime();
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1, noiseSuppression:true, autoGainControl:true}}); }
+  catch(e){ throw new Error('Microphone permission is needed. Allow the microphone for this app in the phone/browser settings, then try again.'); }
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch(e){}
+
+  const d = new Date();
+  const date = d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate());
+  let base = date + '_' + safe(meta.school) + '_' + safe(meta.interviewee), id = base, n = 2;
+  const existing = new Set((await dbAll('interviews')).map(r => r.id));
+  while (existing.has(id)) id = base + '_' + (n++);
+  const ext = /mp4/.test(mime) ? 'm4a' : /ogg/.test(mime) ? 'ogg' : 'webm';
+  const qs = questions().map(q => ({no:q.no, section:q.section||'', stage:q.stage||'', question:q.question, probe:q.probe||'', required: !!q.required}));
+  const rec = {id, fileBase:id, ext, mime: mime || '', status:'recording', ...meta, consent:true, date: d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()),
+    startTime: pad(d.getHours())+':'+pad(d.getMinutes()), questions: qs, notes:{}, visits:[], flags:[], general:'', elapsed:0, chunksDone:0,
+    appVersion: APP_VERSION, device: navigator.userAgent.slice(0,140), demo: isDemo()};
+  R = {rec, questions: qs, idx: 0, stream, recorder: null, seq: 0, writes: [], accum: 0, since: Date.now(), running: true, timer: null, saver: null};
+  rec.visits.push({q: qs[0].no, t: 0});
+  await dbPut('interviews', rec);
+
+  const opts = mime ? {mimeType: mime, audioBitsPerSecond: /mp4/.test(mime) ? 32000 : 24000} : {};
+  const recorder = new MediaRecorder(stream, opts);
+  R.recorder = recorder;
+  recorder.ondataavailable = e => { if (e.data && e.data.size) { const seq = R.seq++; R.writes.push(dbPut('chunks', {id, seq, blob: e.data}).catch(err => { showAlert('Could not write audio to the phone storage. Free some space.'); })); } };
+  recorder.onerror = () => showAlert('Recording error. Save the interview now and start a new one.');
+  stream.getAudioTracks().forEach(t => t.onended = () => showAlert('The microphone stopped. Save the interview now and start a new one.'));
+  recorder.start(5000);
+  R.since = Date.now(); R.running = true;
+  keepAwake();
+  R.timer = setInterval(tick, 500);
+  R.saver = setInterval(persist, 5000);
+  $('#r-pause').textContent = 'Pause'; $('#r-dot').classList.remove('paused'); $('#run-alert').innerHTML = '';
+  show('run'); renderQuestion(); tick();
+}
+function showAlert(msg){ $('#run-alert').innerHTML = '<div class="banner red">' + esc(msg) + '</div>'; }
+function tick(){ if (R) $('#r-time').textContent = fmtDur(elapsed()/1000); }
+function persist(){ if (!R) return; saveMemoNow(); R.rec.elapsed = elapsed()/1000; dbPut('interviews', R.rec).catch(()=>{}); }
+function saveMemoNow(){ if (!R || current !== 'run') return; const q = R.questions[R.idx]; R.rec.notes[String(q.no)] = $('#q-memo').value; }
+
+function renderQuestion(){
+  const q = R.questions[R.idx];
+  $('#q-prog').textContent = 'Question ' + (R.idx+1) + ' of ' + R.questions.length + (q.required ? '' : ' · optional');
+  $('#q-stage').innerHTML = q.stage ? '<span class="chip">' + esc(q.stage) + '</span>' : '';
+  $('#q-section').textContent = q.section || '';
+  $('#q-text').textContent = q.question;
+  const pr = $('#q-probe'); pr.textContent = q.probe ? 'Probe: ' + q.probe : ''; pr.style.display = q.probe ? '' : 'none';
+  $('#q-memo').value = R.rec.notes[String(q.no)] || '';
+  const nf = R.rec.flags.filter(f => String(f.q) === String(q.no)).length;
+  $('#q-flags').textContent = nf ? '⚑ ' + nf : '';
+  $('#r-prev').disabled = R.idx === 0;
+  $('#r-next').textContent = R.idx === R.questions.length - 1 ? 'Finish ✔' : 'Next ▶';
+}
+function goTo(i){
+  saveMemoNow();
+  R.idx = i;
+  R.rec.visits.push({q: R.questions[i].no, t: Math.round(elapsed())});
+  renderQuestion(); persist(); window.scrollTo(0,0);
+}
+$('#r-prev').onclick = () => { if (R.idx > 0) goTo(R.idx - 1); };
+$('#r-next').onclick = () => { if (R.idx < R.questions.length - 1) goTo(R.idx + 1); else openFinish(); };
+let memoT; $('#q-memo').addEventListener('input', () => { if (!R) return; saveMemoNow(); clearTimeout(memoT); memoT = setTimeout(persist, 800); });
+$('#r-flag').onclick = () => { if (!R) return; const t = Math.round(elapsed()); R.rec.flags.push({q: R.questions[R.idx].no, t}); renderQuestion(); persist(); toast('Marked at ' + fmtDur(t/1000)); };
+$('#r-pause').onclick = () => {
+  if (!R) return;
+  if (R.running) { R.accum += Date.now() - R.since; R.running = false; R.recorder.pause(); $('#r-pause').textContent = 'Resume'; $('#r-dot').classList.add('paused'); }
+  else { R.since = Date.now(); R.running = true; R.recorder.resume(); $('#r-pause').textContent = 'Pause'; $('#r-dot').classList.remove('paused'); }
+  tick();
+};
+$('#r-list').onclick = () => {
+  saveMemoNow();
+  const rows = R.questions.map((q, i) => `<div class="qli ${i === R.idx ? 'cur' : ''}" data-i="${i}"><b>${esc(q.no)}</b><span>${esc(q.question)}</span>${(R.rec.notes[String(q.no)]||'').trim() ? '<span class="tick">✓</span>' : ''}</div>`).join('');
+  openModal('<h2>All questions</h2>' + rows + '<button class="btn sec block" style="margin-top:12px" id="m-close">Close</button>');
+  document.querySelectorAll('.qli').forEach(el => el.onclick = () => { closeModal(); goTo(+el.dataset.i); });
+  $('#m-close').onclick = closeModal;
+};
+function openModal(html){ $('#modal-sheet').innerHTML = html; $('#modal').classList.add('on'); }
+function closeModal(){ $('#modal').classList.remove('on'); }
+$('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
+
+document.addEventListener('visibilitychange', () => {
+  if (!R) return;
+  if (!document.hidden) {
+    keepAwake();
+    if (R.recorder && R.recorder.state === 'inactive') showAlert('Recording stopped while the app was in the background. Save the interview now.');
+  }
+});
+window.addEventListener('beforeunload', e => { if (R) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ===== FINISH ===== */
+function openFinish(){
+  saveMemoNow(); persist();
+  const withNotes = R.questions.filter(q => (R.rec.notes[String(q.no)]||'').trim()).length;
+  const missing = R.questions.filter(q => q.required && !(R.rec.notes[String(q.no)]||'').trim() && !R.rec.visits.some(v => String(v.q) === String(q.no)));
+  $('#f-dur').textContent = fmtDur(elapsed()/1000);
+  $('#f-notes').textContent = withNotes + ' / ' + R.questions.length;
+  $('#f-flags').textContent = R.rec.flags.length;
+  $('#f-warn').innerHTML = missing.length ? '<div class="banner">Required questions not reached: ' + missing.map(q => esc(q.no)).join(', ') + '. You can still save.</div>' : '';
+  $('#f-general').value = R.rec.general || '';
+  show('finish');
+}
+$('#f-back').onclick = () => show('run');
+$('#f-save').onclick = async () => {
+  const btn = $('#f-save'); btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    R.rec.general = $('#f-general').value;
+    await finalizeInterview(R);
+    clearInterval(R.timer); clearInterval(R.saver); releaseAwake();
+    R = null;
+    toast('Saved on this phone');
+    show('outbox');
+  } catch(e){ alert('Could not save: ' + (e.message || e)); }
+  finally { btn.disabled = false; btn.textContent = 'Stop recording and save'; }
+};
+async function finalizeInterview(ctx){
+  const rec = ctx.rec;
+  if (ctx.recorder && ctx.recorder.state !== 'inactive') await new Promise(res => { ctx.recorder.onstop = res; ctx.recorder.stop(); });
+  if (ctx.writes) await Promise.all(ctx.writes);
+  if (ctx.stream) ctx.stream.getTracks().forEach(t => t.stop());
+  if (ctx.running) { ctx.accum += Date.now() - ctx.since; ctx.running = false; }
+  rec.elapsed = ctx.accum / 1000;
+  await assembleAudio(rec);
+}
+async function assembleAudio(rec){
+  const parts = (await dbChunks(rec.id)).sort((a,b) => a.seq - b.seq).map(c => c.blob);
+  const blob = new Blob(parts, {type: rec.mime || 'audio/webm'});
+  rec.audio = blob; rec.audioSize = blob.size; rec.status = 'saved'; rec.savedAt = Date.now();
+  await dbPut('interviews', rec);
+  await dbDelChunks(rec.id);
+}
+async function recoverInterview(id){
+  const rec = await dbGet('interviews', id); if (!rec) return;
+  await assembleAudio(rec);
+  toast('Recovered'); show('outbox');
+}
+
+/* ===== OUTBOX ===== */
+const syncing = new Set();
+async function renderOutbox(){
+  const all = (await dbAll('interviews')).filter(r => r.status !== 'recording').sort((a,b) => (b.savedAt||0) - (a.savedAt||0));
+  const unsent = all.filter(r => r.status === 'saved').length;
+  $('#o-sendall').disabled = !unsent;
+  $('#o-banner').innerHTML = !isConfigured() ? '<div class="banner">Set up the server in Settings before sending.</div>' : (!navigator.onLine ? '<div class="banner">You are offline. Interviews are safe on this phone; send them when you have a connection.</div>' : '');
+  if (!all.length) { $('#o-list').innerHTML = '<div class="card">No interviews yet.</div>'; return; }
+  $('#o-list').innerHTML = all.map(r => `
+    <div class="item" data-id="${esc(r.id)}">
+      <div class="t">${esc(r.school)} · ${esc(r.interviewee)} ${r.demo ? '<span class="chip">demo</span>' : ''}</div>
+      <div class="m">${esc(r.date)} ${esc(r.startTime)} · ${esc(r.interviewer)} · ${fmtDur(r.elapsed)} · ${fmtSize(r.audioSize||0)}</div>
+      <div class="row"><span class="chip s-${r.status}">${r.status === 'sent' ? 'Sent' : 'Not sent'}</span><span class="help" id="msg-${esc(r.id)}"></span></div>
+      <div class="prog" id="prog-${esc(r.id)}" hidden><i></i></div>
+      <div class="row" style="margin-top:10px">
+        ${r.status === 'saved' ? `<button class="btn sm" data-act="send">Send</button>` : ''}
+        <button class="btn sm sec" data-act="audio">Audio ⬇</button>
+        <button class="btn sm sec" data-act="notes">Notes ⬇</button>
+        <button class="btn sm sec" data-act="del">Delete</button>
+      </div>
+    </div>`).join('');
+  document.querySelectorAll('#o-list .item').forEach(el => {
+    const id = el.dataset.id;
+    el.querySelectorAll('[data-act]').forEach(b => b.onclick = () => outboxAct(id, b.dataset.act));
+  });
+}
+async function outboxAct(id, act){
+  const rec = await dbGet('interviews', id); if (!rec) return;
+  if (act === 'send') return sendOne(id);
+  if (act === 'audio') return download(rec.audio, rec.fileBase + '.' + rec.ext);
+  if (act === 'notes') return download(new Blob([notesText(rec)], {type:'text/plain'}), rec.fileBase + '_notes.txt');
+  if (act === 'del') {
+    const msg = rec.status === 'sent' ? 'Delete this interview from the phone? (It was already sent.)' : 'This interview has NOT been sent. Delete it from the phone anyway? This cannot be undone.';
+    if (!confirm(msg)) return;
+    await dbDel('interviews', id); renderOutbox();
+  }
+}
+function download(blob, name){
+  if (!blob) return toast('Nothing to download');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+}
+function notesText(rec){
+  const L = [`Interview ${rec.id}`, `School: ${rec.school}`, `Interviewee: ${rec.interviewee}`, `Interviewer: ${rec.interviewer}`, `Date: ${rec.date} ${rec.startTime}`, `Length: ${fmtDur(rec.elapsed)}`, ''];
+  rec.questions.forEach(q => {
+    const v = rec.visits.find(x => String(x.q) === String(q.no));
+    L.push(`Q${q.no} [${v ? fmtDur(v.t/1000) : '--:--'}] ${q.question}`);
+    L.push('  ' + ((rec.notes[String(q.no)] || '').trim() || '(no notes)'));
+    const f = rec.flags.filter(x => String(x.q) === String(q.no)).map(x => fmtDur(x.t/1000));
+    if (f.length) L.push('  Marks: ' + f.join(', '));
+    L.push('');
+  });
+  if (rec.general && rec.general.trim()) L.push('Overall impressions:', rec.general);
+  return L.join('\n');
+}
+function buildPayload(rec){
+  return {id: rec.id, date: rec.date, startTime: rec.startTime, school: rec.school, interviewee: rec.interviewee, interviewer: rec.interviewer,
+    durationSec: Math.round(rec.elapsed), consent: rec.consent, general: rec.general || '', appVersion: rec.appVersion, device: rec.device,
+    audioName: rec.audioName || '', audioUrl: rec.audioUrl || '', demo: !!rec.demo,
+    questions: rec.questions, notes: rec.notes, visits: rec.visits, flags: rec.flags};
+}
+async function sendOne(id){
+  if (syncing.has(id)) return; syncing.add(id);
+  const setMsg = t => { const el = document.getElementById('msg-' + id); if (el) el.textContent = t; };
+  const setProg = f => { const p = document.getElementById('prog-' + id); if (p) { p.hidden = false; p.firstElementChild.style.width = Math.round(f*100) + '%'; } };
+  try {
+    let rec = await dbGet('interviews', id);
+    if (!navigator.onLine) throw new Error('No connection.');
+    const filename = rec.fileBase + '.' + rec.ext;
+    if (!rec.audioUrl) {
+      const total = Math.max(1, Math.ceil(rec.audio.size / CHUNK));
+      for (let i = rec.chunksDone || 0; i < total; i++) {
+        setMsg('Uploading audio ' + (i+1) + '/' + total); setProg(i/total);
+        const data = await blobToB64(rec.audio.slice(i*CHUNK, (i+1)*CHUNK));
+        await api({action:'audioChunk', id, index:i, total, data});
+        rec.chunksDone = i + 1; await dbPut('interviews', rec);
+      }
+      setMsg('Finishing audio…');
+      const r = await api({action:'audioFinalize', id, total, filename, mime: rec.mime || 'audio/webm'});
+      rec.audioUrl = r.url; rec.audioName = r.name; await dbPut('interviews', rec);
+    }
+    setMsg('Saving notes…'); setProg(0.97);
+    await api({action:'saveInterview', record: buildPayload(rec)});
+    rec.status = 'sent'; rec.sentAt = Date.now(); await dbPut('interviews', rec);
+    setProg(1); toast('Sent: ' + rec.school + ' / ' + rec.interviewee);
+  } catch(e){
+    setMsg('Not sent: ' + (e.message || e));
+    toast('Not sent. Your recording is safe on this phone.');
+    syncing.delete(id); return false;
+  }
+  syncing.delete(id); renderOutbox(); return true;
+}
+$('#o-sendall').onclick = async () => {
+  const todo = (await dbAll('interviews')).filter(r => r.status === 'saved');
+  for (const r of todo) { const ok = await sendOne(r.id); if (ok === false) break; }
+};
+
+/* ===== SETTINGS ===== */
+async function renderSettings(){
+  const s = getSettings(), c = getConfig();
+  $('#st-url').value = s.scriptUrl || ''; $('#st-key').value = s.passcode || ''; $('#st-who').value = s.interviewer || '';
+  $('#st-ver').textContent = APP_VERSION;
+  $('#st-upd').textContent = c && c.fetchedAt ? new Date(c.fetchedAt).toLocaleString() : 'never';
+  $('#st-msg').innerHTML = '';
+  try { if (navigator.storage && navigator.storage.estimate) { const e = await navigator.storage.estimate(); $('#st-store').textContent = fmtSize(e.usage||0) + ' / ' + fmtSize((e.quota||0)); } else $('#st-store').textContent = 'n/a'; } catch(e){ $('#st-store').textContent = 'n/a'; }
+}
+$('#st-save').onclick = async () => {
+  setSettings({scriptUrl: $('#st-url').value.trim(), passcode: $('#st-key').value.trim(), interviewer: $('#st-who').value.trim()});
+  const m = $('#st-msg'); m.innerHTML = '<div class="banner">Contacting the server…</div>';
+  try { await updateConfig(); const c = getConfig(); m.innerHTML = `<div class="banner ok">Done. ${c.questions.length} questions, ${c.schools.length} schools loaded.</div>`; $('#st-upd').textContent = new Date(c.fetchedAt).toLocaleString(); }
+  catch(e){ m.innerHTML = '<div class="banner red">' + esc(e.message || e) + '</div>'; }
+};
+$('#st-link').onclick = async () => {
+  const s = getSettings(); if (!s.scriptUrl || !s.passcode) return toast('Save the URL and passcode first');
+  const link = location.origin + location.pathname + '?u=' + encodeURIComponent(s.scriptUrl) + '&k=' + encodeURIComponent(s.passcode);
+  try { await navigator.clipboard.writeText(link); toast('Link copied'); } catch(e){ prompt('Copy this link:', link); }
+};
+
+/* ===== start ===== */
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+(async function init(){
+  await db();
+  show('home');
+})();
+</script>
+</body>
+</html>
