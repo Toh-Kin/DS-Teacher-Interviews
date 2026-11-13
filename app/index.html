@@ -10,6 +10,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Interview Recorder</title>
+<script src="config.js"></script>
 <style>
 :root{--bg:#f7f4ee;--card:#fff;--ink:#16212b;--mute:#5b6b7a;--line:#e0d9cb;--pri:#0b6aa8;--pri-d:#084f7d;--red:#dc2626;--ok:#1e7b3c;--warn:#b45309;--warn-bg:#fef3c7}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -55,6 +56,11 @@ textarea{min-height:150px;resize:vertical}
 .recbar button{background:rgba(255,255,255,.16);color:#fff;border:0;border-radius:9px;padding:9px 12px;font-size:14px;min-height:40px}
 .qmeta{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--mute);margin-bottom:6px}
 .qtext{font-size:21px;font-weight:700;line-height:1.3;margin:6px 0 10px}
+.qtext.rw{font-size:19px;font-weight:600;color:var(--pri);margin:-2px 0 10px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;margin:2px 0 4px}
+.seg button{font:inherit;font-size:13px;font-weight:600;border:0;background:#fff;color:var(--mute);padding:6px 11px;min-height:34px}
+.seg button.on{background:var(--pri);color:#fff}
+.probe b{font-weight:700}
 .probe{background:#fff8d6;border-left:4px solid #FAD201;border-radius:6px;padding:8px 10px;font-size:15px;color:#4a3b00;white-space:pre-wrap}
 #r-flag{background:#FAD201!important;color:#1b1b1b!important;font-weight:700}
 .bottombar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:none;gap:10px;z-index:6}
@@ -83,6 +89,30 @@ textarea{min-height:150px;resize:vertical}
 </header>
 
 <main>
+  <!-- WELCOME (first run) -->
+  <section id="s-welcome" class="screen">
+    <div class="card">
+      <h2>Welcome</h2>
+      <div id="w-step1">
+        <p class="help" style="font-size:15px;margin:0 0 6px">Enter the passcode you were given.</p>
+        <div id="w-url-wrap" hidden>
+          <label for="w-url">Server URL (from Kin)</label>
+          <input type="url" id="w-url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+        </div>
+        <label for="w-key">Passcode</label>
+        <input type="password" id="w-key" autocomplete="off">
+        <button class="btn block" id="w-next" style="margin-top:14px">Continue</button>
+      </div>
+      <div id="w-step2" hidden>
+        <label for="w-who" style="margin-top:0">Who are you?</label>
+        <select id="w-who"></select>
+        <input type="text" id="w-who-other" placeholder="Type your name" style="margin-top:8px" hidden>
+        <button class="btn block" id="w-go" style="margin-top:14px">Start</button>
+      </div>
+      <div id="w-msg" style="margin-top:12px"></div>
+    </div>
+  </section>
+
   <!-- HOME -->
   <section id="s-home" class="screen">
     <div id="home-banners"></div>
@@ -107,6 +137,8 @@ textarea{min-height:150px;resize:vertical}
       <label for="n-school">School</label>
       <select id="n-school"></select>
       <input type="text" id="n-school-other" placeholder="Type the school name" style="margin-top:8px" hidden>
+      <label for="n-type">Who are you interviewing?</label>
+      <select id="n-type"></select>
       <label for="n-id">Interviewee ID (initials only)</label>
       <input type="text" id="n-id" maxlength="12" autocapitalize="characters" autocomplete="off" placeholder="e.g. JM">
       <p class="help">Initials only, no full names.</p>
@@ -132,7 +164,9 @@ textarea{min-height:150px;resize:vertical}
     <div class="card">
       <div class="qmeta"><span id="q-prog"></span><span id="q-stage"></span></div>
       <div class="qmeta" style="margin:0"><span id="q-section"></span><span id="q-flags"></span></div>
+      <div class="seg" id="lang-seg"><button data-m="both">EN + RW</button><button data-m="en">EN</button><button data-m="rw">RW</button></div>
       <div class="qtext" id="q-text"></div>
+      <div class="qtext rw" id="q-text-rw"></div>
       <div class="probe" id="q-probe"></div>
     </div>
     <label for="q-memo" style="margin-top:0">Notes for this question</label>
@@ -207,7 +241,7 @@ textarea{min-height:150px;resize:vertical}
 <script>
 'use strict';
 /* ===== basics ===== */
-const APP_VERSION = '0.2.1';
+const APP_VERSION = '0.4.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad = n => String(n).padStart(2, '0');
@@ -217,24 +251,39 @@ const CHUNK = window.__CHUNK || 1024*1024;   // 1 MB pieces for upload (window._
 let toastT; function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('on'), 2200); }
 
 /* Demo questions: used until real questions are loaded from the spreadsheet. */
+const DEFAULT_TYPES = ['DS Mentor', 'Student Teacher'];
 const DEMO_QUESTIONS = [
-  {no:1, section:'A. Observation', stage:'Observation', question:'(DEMO) Think about the lesson you observed. What did you notice about the learners?', probe:'What did you see or hear that made you say that?', required:true},
-  {no:2, section:'A. Observation', stage:'Observation', question:'(DEMO) What did the student-teacher do well in that lesson?', probe:'Can you give one specific moment?', required:true},
-  {no:3, section:'B. Feedback', stage:'Feedback', question:'(DEMO) What feedback did you give after the lesson?', probe:'When? Face to face or written? How long did it take?', required:true},
-  {no:4, section:'B. Feedback', stage:'Feedback', question:'(DEMO) Why did you choose that feedback?', probe:'What did you want the student-teacher to understand?', required:false},
-  {no:5, section:'C. Next action', stage:'Advice', question:'(DEMO) What advice or next action did you suggest?', probe:'What exactly should they try in the next lesson?', required:true},
-  {no:6, section:'D. Follow-up', stage:'Re-observation', question:'(DEMO) Did you observe the student-teacher again after the advice?', probe:'If yes: what changed? If no: what got in the way?', required:true}
+  {no:1, target:'Both', section:'Opening', stage:'', qEn:'(DEMO) Please tell me briefly about your role.', qRw:'(DEMO · Kinyarwanda text appears here)', pEn:'How long have you been in this role?', pRw:'', required:true},
+  {no:2, target:'DS Mentor', section:'A. Observation', stage:'Observation', qEn:'(DEMO) Think about the lesson you observed. What did you notice about the learners?', qRw:'', pEn:'What did you see or hear that made you say that?', pRw:'', required:true},
+  {no:3, target:'DS Mentor', section:'B. Feedback', stage:'Feedback', qEn:'(DEMO) What feedback did you give after the lesson?', qRw:'', pEn:'When? Face to face or written?', pRw:'', required:true},
+  {no:4, target:'DS Mentor', section:'C. Next action', stage:'Advice', qEn:'(DEMO) What advice or next action did you suggest?', qRw:'', pEn:'What exactly should they try next time?', pRw:'', required:true},
+  {no:5, target:'Student Teacher', section:'A. Observation', stage:'Observation', qEn:'(DEMO) After your lesson, what did your DS Mentor say about it?', qRw:'', pEn:'What did they notice about the learners?', pRw:'', required:true},
+  {no:6, target:'Student Teacher', section:'B. Feedback', stage:'Feedback', qEn:'(DEMO) What feedback did you receive? How was it given?', qRw:'', pEn:'When? Face to face or written?', pRw:'', required:true}
 ];
+const normQ = q => ({no: q.no, target: q.target || 'Both', section: q.section || '', stage: q.stage || '',
+  qEn: q.qEn ?? q.question ?? '', qRw: q.qRw || '', pEn: q.pEn ?? q.probe ?? '', pRw: q.pRw || '', required: !!q.required});
+const isBoth = t => !t || /^(both|all)$/i.test(t);
+function allQuestions(){ const c = getConfig(); return (c && c.questions && c.questions.length) ? c.questions.map(normQ) : DEMO_QUESTIONS; }
+function questionsFor(type){ return allQuestions().filter(q => isBoth(q.target) || String(q.target).toLowerCase() === String(type).toLowerCase()); }
+function interviewTypes(){ const c = getConfig(); return (c && c.types && c.types.length) ? c.types : DEFAULT_TYPES; }
+const typeCode = t => ({'ds mentor':'DSM', 'student teacher':'ST'}[String(t).toLowerCase()] || safe(t).slice(0,4).toUpperCase());
+/* which language(s) to show: 'both' | 'en' | 'rw' (remembered on this phone) */
+const getLangMode = () => localStorage.getItem('langMode') || 'both';
+function langParts(en, rw, mode){
+  if (mode === 'en') return [en || rw, ''];
+  if (mode === 'rw') return [rw || en, ''];
+  return [en || rw, (en && rw) ? rw : ''];
+}
+
 
 /* ===== settings & config (kept in localStorage) ===== */
-/* Optional: paste your server URL (…/exec) between the quotes. Then teammates never need to type it. */
-const DEFAULT_SERVER_URL = '';
+/* The server URL comes from config.js (edit that one-line file), so teammates never need to type it. */
+const DEFAULT_SERVER_URL = (window.APP_CONFIG && window.APP_CONFIG.serverUrl) || '';
 const getSettings = () => { let s = {}; try { s = JSON.parse(localStorage.getItem('settings')||'{}') || {}; } catch(e){}
   if (!s.scriptUrl) s.scriptUrl = DEFAULT_SERVER_URL; return s; };
 const setSettings = o => localStorage.setItem('settings', JSON.stringify({...getSettings(), ...o}));
 const getConfig = () => { try { return JSON.parse(localStorage.getItem('config')||'null'); } catch(e){ return null; } };
 const isConfigured = () => { const s = getSettings(); return !!(s.scriptUrl && s.passcode); };
-function questions(){ const c = getConfig(); return (c && c.questions && c.questions.length) ? c.questions : DEMO_QUESTIONS; }
 const isDemo = () => !(getConfig() && getConfig().questions && getConfig().questions.length);
 
 /* Setup link: ?u=<server url>&k=<passcode> */
@@ -288,20 +337,21 @@ async function api(payload, ms=90000){
 async function updateConfig(){
   const j = await api({action:'config'}, 30000);
   const d = j.data || {};
-  localStorage.setItem('config', JSON.stringify({questions: d.questions||[], schools: d.schools||[], interviewers: d.interviewers||[], fetchedAt: Date.now()}));
+  localStorage.setItem('config', JSON.stringify({questions: d.questions||[], types: d.types||[], schools: d.schools||[], interviewers: d.interviewers||[], fetchedAt: Date.now()}));
 }
 function blobToB64(blob){ return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1] || ''); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob); }); }
 
 /* ===== navigation ===== */
-const SCREENS = ['home','new','run','finish','outbox','settings'];
+const SCREENS = ['welcome','home','new','run','finish','outbox','settings'];
 let current = 'home';
 function show(name){
   current = name;
   SCREENS.forEach(s => $('#s-'+s).classList.toggle('on', s === name));
   $('#run-bar').classList.toggle('on', name === 'run');
-  $('#btn-home').hidden = (name === 'home' || name === 'run' || name === 'finish');
-  $('#title').textContent = {home:'Interview Recorder', new:'New interview', run:'Interview', finish:'Finish', outbox:'Outbox', settings:'Settings'}[name];
+  $('#btn-home').hidden = (name === 'welcome' || name === 'home' || name === 'run' || name === 'finish');
+  $('#title').textContent = {welcome:'Interview Recorder', home:'Interview Recorder', new:'New interview', run:'Interview', finish:'Finish', outbox:'Outbox', settings:'Settings'}[name];
   window.scrollTo(0, 0);
+  if (name === 'welcome') renderWelcome();
   if (name === 'home') renderHome();
   if (name === 'new') renderNew();
   if (name === 'outbox') renderOutbox();
@@ -325,7 +375,8 @@ async function renderHome(){
   document.querySelectorAll('[data-recover]').forEach(el => el.onclick = () => recoverInterview(el.dataset.recover));
   const pending = all.filter(r => r.status === 'saved').length;
   $('#home-pending').textContent = pending ? '(' + pending + ' unsent)' : '';
-  $('#home-q').textContent = isDemo() ? 'demo (' + DEMO_QUESTIONS.length + ')' : questions().length;
+  const per = interviewTypes().map(t => t + ' ' + questionsFor(t).length).join(' · ');
+  $('#home-q').textContent = (isDemo() ? 'demo · ' : '') + per;
   $('#home-s').textContent = c && c.schools ? c.schools.length : '—';
   $('#home-who').textContent = s.interviewer || '—';
   $('#home-net').textContent = navigator.onLine ? 'online' : 'offline';
@@ -349,6 +400,7 @@ function renderNew(){
   fillSelect($('#n-school'), c.schools || [], $('#n-school-other'), '');
   $('#n-school-other').hidden = true; $('#n-school-other').value = '';
   fillSelect($('#n-who'), c.interviewers || [], $('#n-who-other'), s.interviewer || '');
+  $('#n-type').innerHTML = '<option value="">— choose —</option>' + interviewTypes().map(t => `<option>${esc(t)}</option>`).join('');
   $('#n-id').value = ''; $('#n-consent').checked = false; $('#n-err').innerHTML = '';
 }
 const pick = (sel, other) => (sel.value === '__other' ? other.value.trim() : sel.value);
@@ -364,13 +416,14 @@ $('#n-start').onclick = async () => {
   const iid = $('#n-id').value.trim().toUpperCase();
   const errs = [];
   if (!school) errs.push('Choose the school.');
+  if (!$('#n-type').value) errs.push('Choose who you are interviewing (DS Mentor or Student Teacher).');
   if (!/^[A-Z0-9]{1,12}$/.test(iid)) errs.push('Interviewee ID: letters/numbers only (initials), no spaces.');
   if (!who) errs.push('Choose the interviewer.');
   if (!$('#n-consent').checked) errs.push('Tick the consent box (consent must be obtained before recording).');
   if (errs.length) { $('#n-err').innerHTML = '<div class="banner red">' + errs.map(esc).join('<br>') + '</div>'; return; }
   setSettings({interviewer: who});
   const btn = $('#n-start'); btn.disabled = true;
-  try { await beginInterview({school, interviewee: iid, interviewer: who}); }
+  try { await beginInterview({school, interviewee: iid, interviewer: who, type: $('#n-type').value}); }
   catch(e){ $('#n-err').innerHTML = '<div class="banner red">' + esc(e.message || e) + '</div>'; }
   finally { btn.disabled = false; }
 };
@@ -392,11 +445,12 @@ async function beginInterview(meta){
 
   const d = new Date();
   const date = d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate());
-  let base = date + '_' + safe(meta.school) + '_' + safe(meta.interviewee), id = base, n = 2;
+  let base = date + '_' + safe(meta.school) + '_' + typeCode(meta.type) + '_' + safe(meta.interviewee), id = base, n = 2;
   const existing = new Set((await dbAll('interviews')).map(r => r.id));
   while (existing.has(id)) id = base + '_' + (n++);
   const ext = /mp4/.test(mime) ? 'm4a' : /ogg/.test(mime) ? 'ogg' : 'webm';
-  const qs = questions().map(q => ({no:q.no, section:q.section||'', stage:q.stage||'', question:q.question, probe:q.probe||'', required: !!q.required}));
+  const qs = questionsFor(meta.type).map(q => ({no:q.no, section:q.section, stage:q.stage, qEn:q.qEn, qRw:q.qRw, pEn:q.pEn, pRw:q.pRw, required:q.required}));
+  if (!qs.length) { stream.getTracks().forEach(t => t.stop()); throw new Error('There are no questions for "' + meta.type + '". Check the Questions sheet, then update in Settings.'); }
   const rec = {id, fileBase:id, ext, mime: mime || '', status:'recording', ...meta, consent:true, date: d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()),
     startTime: pad(d.getHours())+':'+pad(d.getMinutes()), questions: qs, notes:{}, visits:[], flags:[], general:'', elapsed:0, chunksDone:0,
     appVersion: APP_VERSION, device: navigator.userAgent.slice(0,140), demo: isDemo()};
@@ -404,7 +458,7 @@ async function beginInterview(meta){
   rec.visits.push({q: qs[0].no, t: 0});
   await dbPut('interviews', rec);
 
-  const opts = mime ? {mimeType: mime, audioBitsPerSecond: /mp4/.test(mime) ? 32000 : 24000} : {};
+  const opts = mime ? {mimeType: mime, audioBitsPerSecond: 32000} : {};
   const recorder = new MediaRecorder(stream, opts);
   R.recorder = recorder;
   recorder.ondataavailable = e => { if (e.data && e.data.size) { const seq = R.seq++; R.writes.push(dbPut('chunks', {id, seq, blob: e.data}).catch(err => { showAlert('Could not write audio to the phone storage. Free some space.'); })); } };
@@ -428,8 +482,12 @@ function renderQuestion(){
   $('#q-prog').textContent = 'Question ' + (R.idx+1) + ' of ' + R.questions.length + (q.required ? '' : ' · optional');
   $('#q-stage').innerHTML = q.stage ? '<span class="chip">' + esc(q.stage) + '</span>' : '';
   $('#q-section').textContent = q.section || '';
-  $('#q-text').textContent = q.question;
-  const pr = $('#q-probe'); pr.textContent = q.probe ? 'Probe: ' + q.probe : ''; pr.style.display = q.probe ? '' : 'none';
+  const mode = getLangMode();
+  document.querySelectorAll('#lang-seg button').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+  const [qa, qb] = langParts(q.qEn, q.qRw, mode);
+  $('#q-text').textContent = qa; $('#q-text-rw').textContent = qb; $('#q-text-rw').style.display = qb ? '' : 'none';
+  const [pa, pb] = langParts(q.pEn, q.pRw, mode); const pr = $('#q-probe');
+  pr.innerHTML = (pa || pb) ? '<b>Probe:</b> ' + esc(pa) + (pb ? '<br>' + esc(pb) : '') : ''; pr.style.display = (pa || pb) ? '' : 'none';
   $('#q-memo').value = R.rec.notes[String(q.no)] || '';
   const nf = R.rec.flags.filter(f => String(f.q) === String(q.no)).length;
   $('#q-flags').textContent = nf ? '⚑ ' + nf : '';
@@ -444,6 +502,7 @@ function goTo(i){
 }
 $('#r-prev').onclick = () => { if (R.idx > 0) goTo(R.idx - 1); };
 $('#r-next').onclick = () => { if (R.idx < R.questions.length - 1) goTo(R.idx + 1); else openFinish(); };
+document.querySelectorAll('#lang-seg button').forEach(b => b.onclick = () => { localStorage.setItem('langMode', b.dataset.m); if (R) renderQuestion(); });
 let memoT; $('#q-memo').addEventListener('input', () => { if (!R) return; saveMemoNow(); clearTimeout(memoT); memoT = setTimeout(persist, 800); });
 $('#r-flag').onclick = () => { if (!R) return; const t = Math.round(elapsed()); R.rec.flags.push({q: R.questions[R.idx].no, t}); renderQuestion(); persist(); toast('Marked at ' + fmtDur(t/1000)); };
 $('#r-pause').onclick = () => {
@@ -454,7 +513,7 @@ $('#r-pause').onclick = () => {
 };
 $('#r-list').onclick = () => {
   saveMemoNow();
-  const rows = R.questions.map((q, i) => `<div class="qli ${i === R.idx ? 'cur' : ''}" data-i="${i}"><b>${esc(q.no)}</b><span>${esc(q.question)}</span>${(R.rec.notes[String(q.no)]||'').trim() ? '<span class="tick">✓</span>' : ''}</div>`).join('');
+  const rows = R.questions.map((q, i) => `<div class="qli ${i === R.idx ? 'cur' : ''}" data-i="${i}"><b>${esc(q.no)}</b><span>${esc(q.qEn || q.qRw)}</span>${(R.rec.notes[String(q.no)]||'').trim() ? '<span class="tick">✓</span>' : ''}</div>`).join('');
   openModal('<h2>All questions</h2>' + rows + '<button class="btn sec block" style="margin-top:12px" id="m-close">Close</button>');
   document.querySelectorAll('.qli').forEach(el => el.onclick = () => { closeModal(); goTo(+el.dataset.i); });
   $('#m-close').onclick = closeModal;
@@ -529,7 +588,7 @@ async function renderOutbox(){
   if (!all.length) { $('#o-list').innerHTML = '<div class="card">No interviews yet.</div>'; return; }
   $('#o-list').innerHTML = all.map(r => `
     <div class="item" data-id="${esc(r.id)}">
-      <div class="t">${esc(r.school)} · ${esc(r.interviewee)} ${r.demo ? '<span class="chip">demo</span>' : ''}</div>
+      <div class="t">${esc(r.school)} · ${esc(r.interviewee)} ${r.type ? '<span class="chip">' + esc(r.type) + '</span>' : ''} ${r.demo ? '<span class="chip">demo</span>' : ''}</div>
       <div class="m">${esc(r.date)} ${esc(r.startTime)} · ${esc(r.interviewer)} · ${fmtDur(r.elapsed)} · ${fmtSize(r.audioSize||0)}</div>
       <div class="row"><span class="chip s-${r.status}">${r.status === 'sent' ? 'Sent' : 'Not sent'}</span><span class="help" id="msg-${esc(r.id)}"></span></div>
       <div class="prog" id="prog-${esc(r.id)}" hidden><i></i></div>
@@ -562,10 +621,10 @@ function download(blob, name){
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
 }
 function notesText(rec){
-  const L = [`Interview ${rec.id}`, `School: ${rec.school}`, `Interviewee: ${rec.interviewee}`, `Interviewer: ${rec.interviewer}`, `Date: ${rec.date} ${rec.startTime}`, `Length: ${fmtDur(rec.elapsed)}`, ''];
+  const L = [`Interview ${rec.id}`, `School: ${rec.school}`, `Type: ${rec.type || ''}`, `Interviewee: ${rec.interviewee}`, `Interviewer: ${rec.interviewer}`, `Date: ${rec.date} ${rec.startTime}`, `Length: ${fmtDur(rec.elapsed)}`, ''];
   rec.questions.forEach(q => {
     const v = rec.visits.find(x => String(x.q) === String(q.no));
-    L.push(`Q${q.no} [${v ? fmtDur(v.t/1000) : '--:--'}] ${q.question}`);
+    L.push(`Q${q.no} [${v ? fmtDur(v.t/1000) : '--:--'}] ${q.qEn || q.qRw}` + (q.qEn && q.qRw ? `\n  (${q.qRw})` : ''));
     L.push('  ' + ((rec.notes[String(q.no)] || '').trim() || '(no notes)'));
     const f = rec.flags.filter(x => String(x.q) === String(q.no)).map(x => fmtDur(x.t/1000));
     if (f.length) L.push('  Marks: ' + f.join(', '));
@@ -578,6 +637,7 @@ function buildPayload(rec){
   return {id: rec.id, date: rec.date, startTime: rec.startTime, school: rec.school, interviewee: rec.interviewee, interviewer: rec.interviewer,
     durationSec: Math.round(rec.elapsed), consent: rec.consent, general: rec.general || '', appVersion: rec.appVersion, device: rec.device,
     audioName: rec.audioName || '', audioUrl: rec.audioUrl || '', demo: !!rec.demo,
+    type: rec.type || '',
     questions: rec.questions, notes: rec.notes, visits: rec.visits, flags: rec.flags};
 }
 async function sendOne(id){
@@ -616,6 +676,39 @@ $('#o-sendall').onclick = async () => {
   for (const r of todo) { const ok = await sendOne(r.id); if (ok === false) break; }
 };
 
+/* ===== WELCOME (first run: passcode, then choose your name) ===== */
+const needsWelcome = () => { const s = getSettings(); return !(s.passcode && s.interviewer); };
+function wMsg(html){ $('#w-msg').innerHTML = html; }
+function renderWelcome(){
+  const s = getSettings();
+  $('#w-url-wrap').hidden = !!s.scriptUrl; $('#w-key').value = ''; wMsg('');
+  $('#w-step1').hidden = false; $('#w-step2').hidden = true;
+  if (s.scriptUrl && s.passcode && getConfig()) welcomeStep2();      // passcode already set (e.g. by a setup link)
+}
+function welcomeStep2(){
+  const c = getConfig() || {};
+  fillSelect($('#w-who'), c.interviewers || [], $('#w-who-other'), '');
+  $('#w-who-other').hidden = true; $('#w-step1').hidden = true; $('#w-step2').hidden = false; wMsg('');
+}
+$('#w-next').onclick = async () => {
+  const prev = getSettings();
+  const url = prev.scriptUrl || $('#w-url').value.trim(), key = $('#w-key').value.trim();
+  if (!url) return wMsg('<div class="banner red">Enter the server URL (ask Kin).</div>');
+  if (!key) return wMsg('<div class="banner red">Enter the passcode.</div>');
+  if (!navigator.onLine) return wMsg('<div class="banner red">You are offline. The first setup needs a connection (Wi-Fi or mobile data).</div>');
+  const btn = $('#w-next'); btn.disabled = true; wMsg('<div class="banner">Checking…</div>');
+  setSettings({scriptUrl: url, passcode: key});
+  try { await updateConfig(); welcomeStep2(); }
+  catch(e){ setSettings({passcode: prev.passcode || ''}); wMsg('<div class="banner red">' + esc(e.message || e) + '</div>'); }
+  finally { btn.disabled = false; }
+};
+$('#w-key').addEventListener('keydown', e => { if (e.key === 'Enter') $('#w-next').click(); });
+$('#w-go').onclick = () => {
+  const name = pick($('#w-who'), $('#w-who-other'));
+  if (!name) return wMsg('<div class="banner red">Choose your name.</div>');
+  setSettings({interviewer: name}); show('home'); toast('Welcome, ' + name);
+};
+
 /* ===== SETTINGS ===== */
 async function renderSettings(){
   const s = getSettings(), c = getConfig();
@@ -651,7 +744,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
       catch(e){ window.__setupMsg = 'Setup saved, but questions could not be loaded: ' + (e.message || e) + ' Open Settings and try again.'; }
     }
   }
-  show('home');
+  show(needsWelcome() ? 'welcome' : 'home');
 })();
 </script>
 </body>

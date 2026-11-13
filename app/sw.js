@@ -1,8 +1,9 @@
 // Interview Recorder service worker: keeps the app usable without a connection.
-const CACHE = 'dsint-v0.2.1';
+const CACHE = 'dsint-v0.4.0';
 const INDEX = new URL('./index.html', self.registration.scope).href;
 const ASSETS = [INDEX, new URL('./', self.registration.scope).href,
   new URL('./manifest.webmanifest', self.registration.scope).href,
+  new URL('./config.js', self.registration.scope).href,
   new URL('./icon-192.png', self.registration.scope).href,
   new URL('./icon-512.png', self.registration.scope).href,
   new URL('./apple-touch-icon.png', self.registration.scope).href];
